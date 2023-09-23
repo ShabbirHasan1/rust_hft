@@ -7,6 +7,8 @@ use binance::binance_order_book_data;
 use binance::binance_price_clickhouse;
 use huobi::huobi_btc_price;
 use huobi::huobi_btc_trades;
+use huobi::huobi_asks;
+use huobi::huobi_bids;
 use tokio::time::{sleep, Duration};
 use rocket::{get, routes, http::Status};
 use chrono::NaiveDateTime;
@@ -33,8 +35,6 @@ async fn get_huobi_btc_price() -> Result<Json, Status> {
 async fn get_huobi_btc_trades() -> Result<Json, Status> {
     match huobi_btc_trades().await {
         Ok(trades) => {
-            eprintln!("Fetched Huobi BTC trades successfully: {:?}", trades); // Debugging line
-
             match to_value(trades) {
                 Ok(json_value) => Ok(json_value),
                 Err(_) => Err(Status::InternalServerError),
@@ -44,6 +44,38 @@ async fn get_huobi_btc_trades() -> Result<Json, Status> {
             eprintln!("Error fetching Huobi BTC trades: {:?}", e);
             Err(Status::InternalServerError)
         },
+    }
+}
+
+#[get("/huobi_btc_asks")]
+async fn get_huobi_btc_asks() -> Result<Json, Status> {
+    match huobi_asks().await {
+        Ok(asks) => {
+            match to_value(asks) {
+                Ok(json_value) => Ok(json_value),
+                Err(_) => Err(Status::InternalServerError),
+            }
+        },
+        Err(e) => {
+            eprintln!("Error fetching Huobi asks: {:?}", e);
+            Err(Status::InternalServerError)
+        }
+    }
+}
+
+#[get("/huobi_btc_bids")]
+async fn get_huobi_btc_bids() -> Result<Json, Status> {
+    match huobi_bids().await {
+        Ok(bids) => {
+            match to_value(bids) {
+                Ok(json_value) => Ok(json_value),
+                Err(_) => Err(Status::InternalServerError),
+            }
+        },
+        Err(e) => {
+            eprintln!("Error fetching Huobi bids: {:?}", e);
+            Err(Status::InternalServerError)
+        }
     }
 }
 
@@ -142,7 +174,7 @@ async fn main() {
     tokio::spawn(fetch_binance_btc_price());
 
     let result = rocket::build()
-        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids, get_huobi_btc_price, get_huobi_btc_trades])
+        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids, get_huobi_btc_price, get_huobi_btc_trades, get_huobi_btc_asks, get_huobi_btc_bids])
         .launch()
         .await;
 
