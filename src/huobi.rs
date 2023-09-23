@@ -52,6 +52,29 @@ pub struct BtcTrade {
     pub direction: String,
 }
 
+#[derive(Deserialize, Debug)]
+struct DepthData {
+    asks: Vec<Vec<f64>>,
+    bids: Vec<Vec<f64>>,
+}
+
+#[derive(Deserialize, Debug)]
+struct DepthResponse {
+    tick: DepthData,
+}
+
+#[derive(Serialize, Debug)]
+pub struct OrderBookEntry {
+    pub price: String,
+    pub quantity: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct OrderBook {
+    pub asks: Vec<OrderBookEntry>,
+    pub bids: Vec<OrderBookEntry>,
+}
+
 pub async fn huobi_btc_price() -> Result<BtcPrice, Error> {
     let symbol = "btcusdt";
     let ticker_url = format!("https://api.huobi.pro/market/trade?symbol={}", symbol);
@@ -85,4 +108,34 @@ pub async fn huobi_btc_trades() -> Result<Vec<BtcTrade>, Error> {
     }).collect();
 
     Ok(trades)
+}
+
+pub async fn huobi_asks() -> Result<Vec<OrderBookEntry>, Error> {
+    let symbol = "btcusdt";
+    let depth_url = format!("https://api.huobi.pro/market/depth?symbol={}&type=step0", symbol);
+    let response: DepthResponse = reqwest::get(&depth_url).await?.json().await?;
+
+    let asks: Vec<OrderBookEntry> = response.tick.asks.iter().take(20).map(|ask| {
+        OrderBookEntry {
+            price: ask[0].to_string(),
+            quantity: ask[1].to_string(),
+        }
+    }).collect();
+
+    Ok(asks)
+}
+
+pub async fn huobi_bids() -> Result<Vec<OrderBookEntry>, Error> {
+    let symbol = "btcusdt";
+    let depth_url = format!("https://api.huobi.pro/market/depth?symbol={}&type=step0", symbol);
+    let response: DepthResponse = reqwest::get(&depth_url).await?.json().await?;
+
+    let bids: Vec<OrderBookEntry> = response.tick.bids.iter().take(20).map(|bid| {
+        OrderBookEntry {
+            price: bid[0].to_string(),
+            quantity: bid[1].to_string(),
+        }
+    }).collect();
+
+    Ok(bids)
 }
