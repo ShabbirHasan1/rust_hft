@@ -1,14 +1,32 @@
 mod binance;
+mod huobi;
 
 use binance::binance_btc_price;
 use binance::binance_btc_trades;
 use binance::binance_order_book_data;
 use binance::binance_price_clickhouse;
-use chrono::NaiveDateTime;
-use rocket::{get, routes, http::Status};
+use huobi::huobi_btc_price;
 use tokio::time::{sleep, Duration};
+use rocket::{get, routes, http::Status};
+use chrono::NaiveDateTime;
 use serde_json::Value as Json;
 use serde_json::to_value;
+
+#[get("/huobi_btc_price")]
+async fn get_huobi_btc_price() -> Result<Json, Status> {
+    match huobi_btc_price().await {
+        Ok(price) => {
+            let timestamp = NaiveDateTime::parse_from_str(&price.time, "%Y-%m-%d %H:%M:%S%.9f")
+                .expect("Failed to parse datetime");
+
+            match to_value(price) {
+                Ok(json_value) => Ok(json_value),
+                Err(_) => Err(Status::InternalServerError),
+            }
+        },
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
 
 #[get("/binance_btc_price")]
 async fn get_binance_btc_price() -> Result<Json, Status> {
@@ -104,7 +122,7 @@ async fn main() {
     tokio::spawn(fetch_binance_btc_price());
 
     let result = rocket::build()
-        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids])
+        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids, get_huobi_btc_price])
         .launch()
         .await;
 
