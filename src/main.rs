@@ -1,5 +1,6 @@
 mod binance;
 mod huobi;
+mod kraken;
 
 use binance::binance_btc_price;
 use binance::binance_btc_trades;
@@ -9,11 +10,28 @@ use huobi::huobi_btc_price;
 use huobi::huobi_btc_trades;
 use huobi::huobi_asks;
 use huobi::huobi_bids;
+use kraken::kraken_btc_price;
 use tokio::time::{sleep, Duration};
 use rocket::{get, routes, http::Status};
 use chrono::NaiveDateTime;
 use serde_json::Value as Json;
 use serde_json::to_value;
+
+#[get("/kraken_btc_price")]
+async fn get_kraken_btc_price() -> Result<Json, Status> {
+    match kraken_btc_price().await {
+        Ok(price) => {
+            let _timestamp = NaiveDateTime::parse_from_str(&price.time, "%Y-%m-%d %H:%M:%S%.9f")
+                .map_err(|_| Status::InternalServerError)?;
+
+            match to_value(price) {
+                Ok(json_value) => Ok(json_value),
+                Err(_) => Err(Status::InternalServerError),
+            }
+        },
+        Err(_) => Err(Status::InternalServerError),
+    }
+}
 
 #[get("/huobi_btc_price")]
 async fn get_huobi_btc_price() -> Result<Json, Status> {
@@ -154,7 +172,7 @@ async fn fetch_binance_btc_price() {
                     }
                 };
 
-                if let Err(e) = binance_price_clickhouse("binance", &timestamp, &price.price).await {
+                if let Err(e) = binance_price_clickhouse(&timestamp, &price.price).await {
                     eprintln!("Failed to insert into ClickHouse: {:?}", e);
                 }
             },
@@ -179,7 +197,7 @@ async fn fetch_huobi_btc_price() {
                     }
                 };
 
-                if let Err(e) = binance_price_clickhouse("huobi", &timestamp, &price.price).await {
+                if let Err(e) = binance_price_clickhouse(&timestamp, &price.price).await {
                     eprintln!("Failed to insert into ClickHouse: {:?}", e);
                 }
             },
@@ -198,7 +216,7 @@ async fn main() {
     tokio::spawn(fetch_huobi_btc_price());
 
     let result = rocket::build()
-        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids, get_huobi_btc_price, get_huobi_btc_trades, get_huobi_btc_asks, get_huobi_btc_bids])
+        .mount("/", routes![get_binance_btc_price, get_binance_btc_trades, get_binance_btc_asks, get_binance_btc_bids, get_huobi_btc_price, get_huobi_btc_trades, get_huobi_btc_asks, get_huobi_btc_bids, get_kraken_btc_price])
         .launch()
         .await;
 
